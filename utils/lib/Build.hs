@@ -67,7 +67,7 @@ doBuild (LibraryName whichLibrary)
         coverallsConfig                             = do
   BuildArgs {options, command} <-
     parseArgs $ "Build " ++ whichLibrary ++ " with stack in Buildkite"
-  let RebuildOpts { optBuildDirectory, optCacheDirectory, optDryRun } = options
+  let RebuildOpts { optBuildDirectory, optCacheDirectory, optTimeout, optDryRun } = options
   optBuildkiteEnv <- getBuildkiteEnv
   cacheConfig <- getCacheConfig optBuildkiteEnv optCacheDirectory
   case command of
@@ -76,7 +76,7 @@ doBuild (LibraryName whichLibrary)
       whenRun optDryRun $ do
         cacheGetStep cacheConfig
         cleanBuildDirectory (fromMaybe "." optBuildDirectory)
-      buildResult <- buildStep optDryRun optimizations optBuildkiteEnv testRuns
+      buildResult <- buildStep optTimeout optDryRun optimizations optBuildkiteEnv testRuns
       when (shouldUploadCoverage optBuildkiteEnv) $
         uploadCoverageStep coverallsConfig optDryRun
       whenRun optDryRun $ cachePutStep cacheConfig
@@ -106,13 +106,14 @@ newtype TestRun = TestRun
 newtype StackExtraTestArgs = StackExtraTestArgs (Maybe BuildkiteEnv -> [Text])
 
 buildStep
-  :: DryRun
+  :: Maybe Int
+  -> DryRun
   -> Optimizations
   -> Maybe BuildkiteEnv
   -> [TestRun]
   -- ^ Used to specify different arguments for different test runs.
   -> IO ExitCode
-buildStep dryRun optimizations optBuildkiteEnv testRuns =
+buildStep timeoutVal dryRun optimizations optBuildkiteEnv testRuns =
   echo "--- Build LTS Snapshot"
     *> build Standard ["--only-snapshot"]  .&&.
   echo "--- Build dependencies"
@@ -120,7 +121,7 @@ buildStep dryRun optimizations optBuildkiteEnv testRuns =
   echo "+++ Build"
     *> build optimizations ["--test", "--no-run-tests"] .&&.
   echo "+++ Test"
-    *> foldr (.&&.) (pure ExitSuccess) (timeout 30 . test <$> testRuns)
+    *> foldr (.&&.) (pure ExitSuccess) (timeout (Maybe.fromMaybe 30 timeoutVal) . test <$> testRuns)
   where
   build optimizations' args =
     run dryRun "stack" $ concat

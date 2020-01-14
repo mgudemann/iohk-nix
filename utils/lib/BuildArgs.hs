@@ -46,6 +46,7 @@ data BuildArgs = BuildArgs
 data RebuildOpts = RebuildOpts
     { optBuildDirectory :: Maybe FilePath
     , optCacheDirectory :: Maybe FilePath
+    , optTimeout        :: Maybe Int
     , optDryRun :: DryRun
     } deriving (Show)
 
@@ -73,6 +74,7 @@ rebuildOpts :: Parser RebuildOpts
 rebuildOpts = RebuildOpts
     <$> optional buildDir
     <*> optional cacheName
+    <*> optional timeoutVal
     <*> dryRun
   where
     buildDir = option
@@ -86,6 +88,11 @@ rebuildOpts = RebuildOpts
         (  long "cache-dir"
         <> metavar "DIR"
         <> help "Location of project's cache"
+        )
+    timeoutVal = option
+        auto
+        (  long "time-out"
+        <> help "Timeout for build steps in minutes"
         )
     dryRun = flag Run DryRun
         (  long "dry-run"

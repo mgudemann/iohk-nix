@@ -19,6 +19,7 @@ import qualified Filesystem.Path.CurrentOS as FP
 data RebuildOpts = RebuildOpts
     { optBuildDirectory :: Maybe FilePath
     , optCacheDirectory :: Maybe FilePath
+    , optTimeout        :: Maybe Int
     , optDryRun :: DryRun
     } deriving (Show)
 
@@ -50,6 +51,7 @@ rebuildOpts :: Parser RebuildOpts
 rebuildOpts = RebuildOpts
     <$> optional buildDir
     <*> optional cacheName
+    <*> optional timeoutVal
     <*> dryRun
   where
     buildDir = option
@@ -63,6 +65,11 @@ rebuildOpts = RebuildOpts
         (  long "cache-dir"
         <> metavar "DIR"
         <> help "Location of project's cache"
+        )
+    timeoutVal = option
+        auto
+        (  long "time-out"
+        <> help "Timeout for build steps in minutes"
         )
     dryRun = flag Run DryRun
         (  long "dry-run"
@@ -90,8 +97,8 @@ data QA = QuickTest | FullTest deriving (Show, Eq)
 
 data Jobs = Serial | Parallel deriving (Show, Eq)
 
-buildStep :: DryRun -> Maybe BuildkiteEnv -> IO ExitCode
-buildStep dryRun bk =
+buildStep :: Maybe Int -> DryRun -> Maybe BuildkiteEnv -> IO ExitCode
+buildStep timeoutVal dryRun bk =
     echo "--- Build LTS Snapshot"
         *> build Standard ["--only-snapshot"]  .&&.
     echo "--- Build dependencies"
@@ -99,7 +106,7 @@ buildStep dryRun bk =
     echo "+++ Build"
         *> build Fast ["--test", "--no-run-tests"] .&&.
     echo "+++ Test"
-        *> timeout 30 (test Fast Serial .&&. test Fast Parallel)
+        *> timeout (Maybe.fromMaybe 30 timeoutVal) (test Fast Serial .&&. test Fast Parallel)
   where
     build opt args =
         run dryRun "stack" $ concat
