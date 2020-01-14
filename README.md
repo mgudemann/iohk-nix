@@ -24,7 +24,7 @@ See [Starting a new project](./docs/start.md).
 
 ## How to update the `iohk-nix` revision.
 
-niv update iohk-nix
+nix update iohk-nix
 
 Some things may have changed which could break your build, so refer to
 the [ChangeLog](./changelog.md).
